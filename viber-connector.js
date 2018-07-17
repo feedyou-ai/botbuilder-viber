@@ -6,6 +6,7 @@ const VMessage = require('viber-bot').Message
 const winston = require('winston')
 const toYAML = require('winston-console-formatter') // makes the output more friendly
 const async = require('async')
+var util = require('util')
 
 /*
 Until BotBuilder supports custom channels,
@@ -22,7 +23,7 @@ const logger = (function() {
 
 //function to quickly translate objects into readable strings
 const prettify = obj => {
-  if (typeof obj == 'string') return string
+  if (typeof obj === 'string') return obj
   else return JSON.stringify(obj, null, ' ')
 }
 
@@ -74,8 +75,9 @@ var ViberEnabledConnector = (function() {
       channelId: ViberChannelId,
       user: { id: encodeURIComponent(userProfile.id), name: userProfile.name },
       bot: { id: 'viberbot', name: self.options.Name },
-      conversation: { id: 'ViberConversationId' }
+      conversation: { id: encodeURIComponent(userProfile.id) }
     }
+
     var msg = new builder.Message()
       .address(addr)
       .timestamp(convertTimestamp(message.timestamp))
@@ -132,7 +134,9 @@ var ViberEnabledConnector = (function() {
 
   ViberEnabledConnector.prototype.convertToViberMessages = function(message) {
     var viberKb = null
-    logger.info('OBJECT OF TYPE %s:\n%s\n', message.type, prettify(message))
+    logger.info('OBJECT OF TYPE %s:\n%s\n', message.type, util.inspect(message)) // prettify(message))
+
+    util.inspect(message)
 
     if (message.sourceEvent && message.sourceEvent.type) {
       switch (message.sourceEvent.type) {
@@ -169,8 +173,12 @@ var ViberEnabledConnector = (function() {
             message.attachments.forEach(element => {
               var attachment = element.content
 
-              logger.info('CARD OBJECT %s:\n%s\n', message.type, prettify(attachment, null, ' '))
-              if (attachment.buttons[0].type && attachment.images[0].url) {
+              logger.info('CARD OBJECT %s:\n%s\n', message.type, util.inspect(attachment))
+
+              if (
+                (attachment.buttons[0].type || attachment.buttons[0][0].data.type) &&
+                attachment.images[0].url
+              ) {
                 //adding images one by one horizontally in the top 3 rows
                 for (var i = 0; i < attachment.images.length; i++) {
                   allAttachments.push({
@@ -203,18 +211,20 @@ var ViberEnabledConnector = (function() {
                 })
                 //adding buttons one by one horizontally in a single bottom row
                 for (var i = 0; i < attachment.buttons.length; i++) {
+                  var buttonAttachment = attachment.buttons[0].type
+                    ? attachment.buttons[i]
+                    : attachment.buttons[i][0].data
                   allAttachments.push({
                     //button
                     Rows: 1,
                     Columns: 6 / attachment.buttons.length,
                     ActionType:
-                      attachment.buttons[i].type === 'reply' ||
-                      attachment.buttons[i].type === 'imBack'
+                      buttonAttachment.type === 'reply' || buttonAttachment.type === 'imBack'
                         ? 'reply'
                         : 'open-url',
-                    ActionBody: attachment.buttons[i].value,
+                    ActionBody: buttonAttachment.value,
                     Text:
-                      '<b><font size="4" color="#FFFFFF">' + attachment.buttons[i].title ||
+                      '<b><font size="4" color="#FFFFFF">' + buttonAttachment.title ||
                       '' + '</font></b>',
                     BgColor: '#7536D1',
                     TextSize: attachment.buttons.length === 1 ? 'large' : 'small',
@@ -322,9 +332,8 @@ var ViberEnabledConnector = (function() {
   }
 
   ViberEnabledConnector.prototype.startConversation = function(address, done) {
-    var addr = address
     address.conversation = { id: 'ViberConversationId' }
-    done(null, addr)
+    done(null, address)
   }
 
   return ViberEnabledConnector
