@@ -387,7 +387,7 @@ var ViberEnabledConnector = (function() {
 
   ViberEnabledConnector.prototype.postMessage = function(message, cb) {
     var self = this,
-      addr = message.address,
+      addr = message.address;
     var realUserId = decodeURIComponent(addr.user.id);
     var profile = new UserProfile(realUserId, addr.user.name, "", "", "");
     if (message.type === "typing") {
